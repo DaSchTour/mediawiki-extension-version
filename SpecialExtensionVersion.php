@@ -441,8 +441,14 @@ class SpecialExtensionVersion extends SpecialPage {
 			$gitHeadSHA1 = $gitInfo->getHeadSHA1();
 			if ( $gitHeadSHA1 !== false ) {
 				$gitCurrentBranch = $gitInfo->getCurrentBranch();
+				if ($gitCurrentBranch == 'master') {
+					$branchstart = '<td style="background-color:#D9EDF7">';
+				}
+				else {
+					$branchstart = "<td>";
+				}
 				if ( $gitCurrentBranch ) {
-					$branchText = $gitCurrentBranch . "</td>";
+					$branchText = $branchstart . $gitCurrentBranch . "</td>";
 				}
 				
 				$vcsText = '(' . substr( $gitHeadSHA1, 0, 7 ) . ')';
@@ -466,7 +472,15 @@ class SpecialExtensionVersion extends SpecialPage {
 					$datetime2 = new DateTime();
 					$interval = $datetime1->diff($datetime2);
 					$intervalstring = $interval->format('%a days ago');
-					$vcsText .= "<td>" . $datestring . ' (' . $intervalstring . ')';
+					$diffint = intval($interval->format('%a'));
+					if ($diffint < 30) {
+					    $color = "#DFF0D8";
+					} elseif ($diffint < 120) {
+					    $color = "#FCF8E3";
+					} else {
+						$color = "#F2DEDE";
+					}
+					$vcsText .= '<td style="background-color:'.$color.'">' . $datestring . ' (' . $intervalstring . ')</td>';
 				}
 								
 			} else {
@@ -476,6 +490,7 @@ class SpecialExtensionVersion extends SpecialPage {
 					$directoryRev = isset( $svnInfo['directory-rev'] ) ? $svnInfo['directory-rev'] : null;
 					$vcsText = $this->msg( 'version-svn-revision', $directoryRev, $svnInfo['checkout-rev'] )->text();
 					$vcsText = isset( $svnInfo['viewvc-url'] ) ? '[' . $svnInfo['viewvc-url'] . " $vcsText]" : $vcsText;
+					$vcsText = '<td colspan="3"> SVN: ' . $vcsText . '</td>';
 				}
 			}
 		}
@@ -514,8 +529,7 @@ class SpecialExtensionVersion extends SpecialPage {
 
 		if ( $vcsText !== false ) {
 			$extNameVer = "<tr>
-				<td><em>$mainLink</td><td>$versionText</em></td>
-				<td><em>$vcsText</em></td>";
+				<td><em>$mainLink</td><td>$versionText</em></td>$vcsText";
 		} else {
 			$extNameVer = "<tr>
 				<td colspan=\"2\"><em>$mainLink</td><td>$versionText</em></td>";
