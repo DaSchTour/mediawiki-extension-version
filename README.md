@@ -1,0 +1,2 @@
+mediawiki-extension-version
+===========================
