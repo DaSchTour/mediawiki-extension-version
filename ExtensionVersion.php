@@ -21,6 +21,9 @@ $wgExtensionCredits['specialpage'][] = array (
 	'version'=>'0.0.3',
 );
 
+$wgGroupPermissions['sysop']['extensionversion'] = true;
+$wgAvailableRights[] = 'extensionversion';
+
 $dir = dirname( __FILE__ ) . '/';
 
 $wgExtensionMessagesFiles['ExtensionVersion']      = $dir . 'ExtensionVersion.i18n.php';

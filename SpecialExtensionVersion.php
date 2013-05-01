@@ -41,7 +41,7 @@ class SpecialExtensionVersion extends SpecialPage {
 	);
 
 	public function __construct() {
-		parent::__construct( 'ExtensionVersion' );
+		parent::__construct( 'ExtensionVersion', 'extensionversion' );
 	}
 
 	/**
@@ -49,7 +49,12 @@ class SpecialExtensionVersion extends SpecialPage {
 	 */
 	public function execute( $par ) {
 		global $wgSpecialVersionShowHooks, $IP;
-
+        
+        if (  !$this->userCanExecute( $this->getUser() )  ) {
+                $this->displayRestrictionError();
+                return;
+        }
+        
 		$this->setHeaders();
 		$this->outputHeader();
 		$out = $this->getOutput();
