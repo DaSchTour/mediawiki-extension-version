@@ -261,8 +261,14 @@ class SpecialExtensionVersion extends SpecialPage {
 		$gitPullDate = $gitInfo->getPullDate();
 		if ( $gitPullDate ) {
 			$datestring = date("d.m.Y",$gitPullDate);
-			$shortSHA1 .= "<br/>" .$datestring;
+			$shortSHA1 .= "<br/>Last checked for Update: " .$datestring;
 		}
+        
+        $gitCommitDate = $gitInfo->getOriginCommitDate();
+        if ( $gitCommitDate ) {
+            $datestring = date("d.m.Y",$gitCommitDate);
+            $shortSHA1 .= "<br/>Last commit: " .$datestring;
+        }
 		
 		return self::getwgVersionLinked() . " $shortSHA1";
 	}
@@ -472,7 +478,7 @@ class SpecialExtensionVersion extends SpecialPage {
 				
 				$datetimeTody = new DateTime();
 				
-				$gitHeadCommitDate = $gitInfo->getHeadCommitDate();
+				$gitHeadCommitDate = $gitInfo->getOriginCommitDate();
 				if ( $gitHeadCommitDate ) {
 					$datestringHeadCommit = date("d.m.Y",$gitHeadCommitDate);
 					$datetimeHeadCommit = new DateTime($datestringHeadCommit);
@@ -916,4 +922,23 @@ class ExtendedGitInfo extends GitInfo {
 			return $remoteBrancheList;
 		}
 	}
+    public function getOriginCommitDate() {
+        global $wgGitBin;
+
+        if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
+            return false;
+        }
+
+        $environment = array( "GIT_DIR" => $this->basedir );
+        $cmd = wfEscapeShellArg( $wgGitBin ) . " show -s --format=format:%ct origin/master";
+        $retc = false;
+        $commitDate = wfShellExec( $cmd, $retc, $environment );
+
+        if ( $retc !== 0 ) {
+            return false;
+        } else {
+            return (int)$commitDate;
+        }
+
+     }
 }
