@@ -58,7 +58,7 @@ class SpecialExtensionVersion extends SpecialPage {
 		if ( $par !== 'Credits' ) {
 			$text =
 				//$this->getMediaWikiCredits() .
-				//$this->softwareInformation() .
+				$this->softwareInformation() .
 				//$this->getEntryPointInfo() .
 				$this->getExtensionCredits();
 			/*
@@ -102,6 +102,7 @@ class SpecialExtensionVersion extends SpecialPage {
 		$software['[https://www.mediawiki.org/ MediaWiki]'] = self::getVersionLinked();
 		$software['[http://www.php.net/ PHP]'] = phpversion() . " (" . PHP_SAPI . ")";
 		$software[$dbr->getSoftwareLink()] = $dbr->getServerInfo();
+		$software['Serversoftware'] = $_SERVER['SERVER_SOFTWARE'];
 
 		// Allow a hook to add/remove items.
 		wfRunHooks( 'SoftwareInfo', array( &$software ) );
@@ -120,8 +121,7 @@ class SpecialExtensionVersion extends SpecialPage {
 				</tr>\n";
 		}
 
-		//return $out . Xml::closeElement( 'table' );
-		return '';
+		return $out . Xml::closeElement( 'table' );
 	}
 
 	/**
@@ -235,7 +235,7 @@ class SpecialExtensionVersion extends SpecialPage {
 	private static function getVersionLinkedGit() {
 		global $IP, $wgLang;
 
-		$gitInfo = new GitInfo( $IP );
+		$gitInfo = new ExtendedGitInfo( $IP );
 		$headSHA1 = $gitInfo->getHeadSHA1();
 		if ( !$headSHA1 ) {
 			return false;
@@ -257,6 +257,11 @@ class SpecialExtensionVersion extends SpecialPage {
 		$gitCurrentBranch = $gitInfo->getCurrentBranch();
 		if ( $gitCurrentBranch ) {
 			$shortSHA1 .= "<br/>" . $gitCurrentBranch;
+		}
+		$gitPullDate = $gitInfo->getPullDate();
+		if ( $gitPullDate ) {
+			$datestring = date("d.m.Y",$gitPullDate);
+			$shortSHA1 .= "<br/>" .$datestring;
 		}
 		
 		return self::getwgVersionLinked() . " $shortSHA1";
@@ -451,6 +456,11 @@ class SpecialExtensionVersion extends SpecialPage {
 					$branchText = $branchstart . $gitCurrentBranch . "</td>";
 				}
 				
+				$gitRemoteBranches = $gitInfo->getRemoteBranchList();
+				if ( $gitRemoteBranches ) {
+					$branchText .= '<td>' . $gitRemoteBranches . '</td>';
+				}
+				
 				$vcsText = '(' . substr( $gitHeadSHA1, 0, 7 ) . ')';
 				$gitViewerUrl = $gitInfo->getHeadViewUrl();
 				if ( $gitViewerUrl !== false ) {
@@ -459,28 +469,56 @@ class SpecialExtensionVersion extends SpecialPage {
 				else {
 					$vcsText = $branchText . $vcsText;
 				}
-				/**$gitHeadCommitDate = $gitInfo->getHeadCommitDate();
+				
+				$datetimeTody = new DateTime();
+				
+				$gitHeadCommitDate = $gitInfo->getHeadCommitDate();
 				if ( $gitHeadCommitDate ) {
-					$vcsText .= "<br/>" . $wgLang->timeanddate( $gitHeadCommitDate, true );
-				}**/
+					$datestringHeadCommit = date("d.m.Y",$gitHeadCommitDate);
+					$datetimeHeadCommit = new DateTime($datestringHeadCommit);
+					
+					$intervalLastRemoteUpdate = $datetimeHeadCommit->diff($datetimeTody);
+					$intervalstring = $intervalLastRemoteUpdate->format('%a days ago');
+					
+					$diffintLastRemoteUpdate = intval($intervalLastRemoteUpdate->format('%R%a'));
+					
+					if ($diffintLastRemoteUpdate < 180) {
+						$color = "#DFF0D8";
+					} elseif ($diffintLastRemoteUpdate < 360) {
+						$color = "#FCF8E3";
+					}
+					else {
+						$color = "#F2DEDE";
+					}
+					
+					$vcsText .= '<td style="background-color:'.$color.'">'. $datestringHeadCommit . "<br/>(".$intervalstring.")</td>";
+				}
 				
 
 				$gitPullDate = $gitInfo->getPullDate();
 				if ( $gitPullDate ) {
-					$datestring = date("d.m.Y",$gitPullDate);
-					$datetime1 = new DateTime($datestring);
-					$datetime2 = new DateTime();
-					$interval = $datetime1->diff($datetime2);
-					$intervalstring = $interval->format('%a days ago');
-					$diffint = intval($interval->format('%a'));
-					if ($diffint < 30) {
+					$datestringPullDate = date("d.m.Y",$gitPullDate);
+					
+					$datetime1 = new DateTime($datestringPullDate);
+					
+					$intervalLastUpdate = $datetime1->diff($datetimeTody);
+					$intervalLocalRemoteUpdate = $datetime1->diff($datetimeHeadCommit);
+					$intervalstring = $intervalLastUpdate->format('%a days ago');
+					$diffint = intval($intervalLastUpdate->format('%a'));
+					$diffint2 = intval($intervalLocalRemoteUpdate->format('%R%a'));
+					
+					if ($diffint2 <= 0) {
+						$color = "#D9EDF7";
+					}
+					elseif ($diffint < 30) {
 					    $color = "#DFF0D8";
 					} elseif ($diffint < 120) {
 					    $color = "#FCF8E3";
-					} else {
+					}
+					else {
 						$color = "#F2DEDE";
 					}
-					$vcsText .= '<td style="background-color:'.$color.'">' . $datestring . ' (' . $intervalstring . ')</td>';
+					$vcsText .= '<td style="background-color:'.$color.'">' . $datestringPullDate . '<br/>(' . $intervalstring . ')</td>';
 				}
 								
 			} else {
@@ -578,7 +616,7 @@ class SpecialExtensionVersion extends SpecialPage {
 	}
 
 	private function openExtType( $text, $name = null ) {
-		$opt = array( 'colspan' => 5 );
+		$opt = array( 'colspan' => 7 );
 		$out = '';
 
 		if ( $this->firstExtOpened ) {
@@ -592,7 +630,7 @@ class SpecialExtensionVersion extends SpecialPage {
 		}
 
 		$out .= "<tr>" . Xml::element( 'th', $opt, $text ) . "</tr>\n";
-		$out .= "<tr><td><b>Name</b></td><td><b>Version</b></td><td><b>Branch</b></td><td><b>ID</b></td><td><b>Update-Check</b></td></tr>\n";
+		$out .= "<tr><td><b>Name</b></td><td><b>Version</b></td><td><b>current Branch</b></td><td><b>remote Branches</b></td><td><b>ID</b></td><td><b>Remote Update</b></td><td><b>Local Update Check</b></td></tr>\n";
 
 		return $out;
 	}
@@ -854,5 +892,28 @@ class ExtendedGitInfo extends GitInfo {
 		$lastlinearray = explode(' ', $lastline);
 		$rawdate = $lastlinearray[4];
 		return $rawdate;
+	}
+	public function getRemoteBranchList() {
+		global $wgGitBin;
+		
+		if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
+			return false;
+		}
+		
+		$environment = array( "GIT_DIR" => $this->basedir );
+		$cmd = wfEscapeShellArg( $wgGitBin ) . " branch -r";
+		$retc = false;
+		$remoteBranches = wfShellExec( $cmd, $retc, $environment );
+		$remoteBrancheList = '<ul style="list-style-image:none;font-size:0.6em;">';
+		$remoteBranchArray = explode(PHP_EOL,$remoteBranches);
+		foreach ($remoteBranchArray as $value) {
+			$remoteBrancheList .= '<li>' . $value . '</li>';
+		}
+		$remoteBrancheList .= '</ul>';
+		if ( $retc !== 0 ) {
+			return false;
+		} else {
+			return $remoteBrancheList;
+		}
 	}
 }
