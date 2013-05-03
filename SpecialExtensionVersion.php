@@ -444,31 +444,37 @@ class SpecialExtensionVersion extends SpecialPage {
 		$name = isset( $extension['name'] ) ? $extension['name'] : '[no name]';
 
 		$vcsText = false;
+        $td = '<td>';
+        $addRowspan = '';
+        $gitCurrentBranch = false;
 
 		if ( isset( $extension['path'] ) ) {
 			$gitInfo = new ExtendedGitInfo( dirname( $extension['path'] ) );
+            
 			$gitHeadSHA1 = $gitInfo->getHeadSHA1();
-			if ( $gitHeadSHA1 !== false ) {
+            
+            if ( $gitHeadSHA1 !== false ) {
+			    $fetchResult = $gitInfo->doFetch();
 				$gitCurrentBranch = $gitInfo->getCurrentBranch();
-				if ($gitCurrentBranch == 'master') {
-					$branchstart = '<td style="background-color:#D9EDF7">';
-				}
-				else {
-					$branchstart = "<td>";
-				}
+				
+				if ($gitCurrentBranch != 'master') {
+                    $addRowspan = 'rowspan=2';
+                    $td = '<td ' . $addRowspan . '>';
+                }
+
 				if ( $gitCurrentBranch ) {
-					$branchText = $branchstart . $gitCurrentBranch . "</td>";
+					$branchText = '<td style="background-color:#D9EDF7">' . $gitCurrentBranch . "</td>";
 				}
 				
 				$gitRemoteBranches = $gitInfo->getRemoteBranchList();
 				if ( $gitRemoteBranches ) {
-					$branchText .= '<td>' . $gitRemoteBranches . '</td>';
+					$branchText .= $td . $gitRemoteBranches . '</td>';
 				}
                 
 				$vcsText = '(' . substr( $gitHeadSHA1, 0, 7 ) . ')';
 				$gitViewerUrl = $gitInfo->getHeadViewUrl();
 				if ( $gitViewerUrl !== false ) {
-					$vcsText = "$branchText<td>[$gitViewerUrl $vcsText]";
+					$vcsText = "$branchText $td [$gitViewerUrl $vcsText]";
 				}
 				else {
 					$vcsText = $branchText . $vcsText;
@@ -480,55 +486,7 @@ class SpecialExtensionVersion extends SpecialPage {
                 }
 				$vcsText .= '</td>';
 				
-				$datetimeTody = new DateTime();
-				
-				$gitHeadCommitDate = $gitInfo->getOriginCommitDate();
-				if ( $gitHeadCommitDate ) {
-					$datestringHeadCommit = date("d.m.Y",$gitHeadCommitDate);
-					$datetimeHeadCommit = new DateTime($datestringHeadCommit);
-					
-					$intervalLastRemoteUpdate = $datetimeHeadCommit->diff($datetimeTody);
-					$intervalstring = $intervalLastRemoteUpdate->format('%a days ago');
-					
-					$diffintLastRemoteUpdate = intval($intervalLastRemoteUpdate->format('%R%a'));
-					
-					if ($diffintLastRemoteUpdate < 180) {
-						$color = "#DFF0D8";
-					} elseif ($diffintLastRemoteUpdate < 360) {
-						$color = "#FCF8E3";
-					}
-					else {
-						$color = "#F2DEDE";
-					}
-					
-					$vcsText .= '<td style="background-color:'.$color.'">'. $datestringHeadCommit . "<br/>(".$intervalstring.")</td>";
-
-    				$gitPullDate = $gitInfo->getPullDate();
-    				if ( $gitPullDate ) {
-    					$datestringPullDate = date("d.m.Y",$gitPullDate);
-    					
-    					$datetime1 = new DateTime($datestringPullDate);
-    					
-    					$intervalLastUpdate = $datetime1->diff($datetimeTody);
-    					$intervalLocalRemoteUpdate = $datetime1->diff($datetimeHeadCommit);
-    					$intervalstring = $intervalLastUpdate->format('%a days ago');
-    					$diffint = intval($intervalLastUpdate->format('%a'));
-    					$diffint2 = intval($intervalLocalRemoteUpdate->format('%R%a'));
-    					
-    					if ($diffint2 <= 0) {
-    						$color = "#D9EDF7";
-    					}
-    					elseif ($diffint < 30) {
-    					    $color = "#DFF0D8";
-    					} elseif ($diffint < 120) {
-    					    $color = "#FCF8E3";
-    					}
-    					else {
-    						$color = "#F2DEDE";
-    					}
-    					$vcsText .= '<td style="background-color:'.$color.'">' . $datestringPullDate . '<br/>(' . $intervalstring . ')</td>';
-    				}
-                }
+				$vcsText .= $this->getGitBranchInfos($gitInfo,$gitCurrentBranch);
 								
 			} else {
 				$svnInfo = self::getSvnInfo( dirname( $extension['path'] ) );
@@ -573,22 +531,93 @@ class SpecialExtensionVersion extends SpecialPage {
 				$description = $this->msg( $descriptionMsg )->text();
 			}
 		}
-
+        
 		if ( $vcsText !== false ) {
 			$extNameVer = "<tr>
-				<td><em>$mainLink</td><td>$versionText</em></td>$vcsText";
+				$td<em>$mainLink</td>$td$versionText</em></td>$vcsText";
 		} else {
 			$extNameVer = "<tr>
-				<td colspan=\"2\"><em>$mainLink</td><td>$versionText</em></td>";
+				<td colspan=\"2\" $addRowspan><em>$mainLink</td>$td$versionText</em></td>";
 		}
-
+        
+        $extNameVer .= $td . $fetchResult . '</td>';
+        
 		$author = isset( $extension['author'] ) ? $extension['author'] : array();
 		$extDescAuthor = "<td>$description</td>
 			<td>" . $this->listAuthors( $author, false ) . "</td>
 			</tr>\n";
-
+        if ($gitCurrentBranch) {
+            if ($gitCurrentBranch != 'master') {
+                $extNameVer .= '</tr><tr><td>master</td>' . $this->getGitBranchInfos($gitInfo) . '</tr>';
+            }
+            else {
+                $extNameVer .= '</tr>';
+            }
+        }   
 		return $extNameVer /*. $extDescAuthor*/;
 	}
+    /**
+     * Get Branch and Update Information 
+     * 
+     */
+    private function getGitBranchInfos($gitInfo,$branch = 'master')
+    {
+        $datetimeTody = new DateTime();
+        $out = '';       
+            $gitOriginCommitDate = $gitInfo->getOriginCommitDate($branch);
+            if ( $gitOriginCommitDate ) {
+                $datestringHeadCommit = date("d.m.Y",$gitOriginCommitDate);
+                $datetimeHeadCommit = new DateTime($datestringHeadCommit);
+                
+                $intervalHeadCommit = $datetimeHeadCommit->diff($datetimeTody);
+                $intervalstringHeadCommit = $intervalHeadCommit->format('%a days ago');
+                
+                $diffintHeadCommit = intval($intervalHeadCommit->format('%R%a'));
+                
+                if ($diffintHeadCommit < 180) {
+                    $color = "#DFF0D8";
+                } elseif ($diffintHeadCommit < 360) {
+                    $color = "#FCF8E3";
+                }
+                else {
+                    $color = "#F2DEDE";
+                }
+                
+                $out .= '<td style="background-color:'.$color.'">'. $datestringHeadCommit . "<br/>(".$intervalstringHeadCommit.")</td>";
+                if ($branch != 'master') {
+                    $pullbranch = '';
+                }
+                else {
+                    $pullbranch = $branch;
+                }
+                $gitPullDate = $gitInfo->getPullDate($pullbranch);
+                if ( $gitPullDate ) {
+                    $datestringPullDate = date("d.m.Y",$gitPullDate);
+                    
+                    $datetime1 = new DateTime($datestringPullDate);
+                    
+                    $intervalLastUpdate = $datetime1->diff($datetimeTody);
+                    $intervalLocalRemoteUpdate = $datetime1->diff($datetimeHeadCommit);
+                    $intervalstring = $intervalLastUpdate->format('%a days ago');
+                    $diffint = intval($intervalLastUpdate->format('%a'));
+                    $diffint2 = intval($intervalLocalRemoteUpdate->format('%R%a'));
+                    
+                    if ($diffint2 <= 0) {
+                        $color = "#D9EDF7";
+                    }
+                    elseif ($diffint < 30) {
+                        $color = "#DFF0D8";
+                    } elseif ($diffint < 120) {
+                        $color = "#FCF8E3";
+                    }
+                    else {
+                        $color = "#F2DEDE";
+                    }
+                    $out .= '<td style="background-color:'.$color.'">' . $datestringPullDate . '<br/>(' . $intervalstring . ')</td>';
+                }
+            }
+        return $out;
+    }
 
 	/**
 	 * Generate wikitext showing hooks in $wgHooks.
@@ -625,7 +654,7 @@ class SpecialExtensionVersion extends SpecialPage {
 	}
 
 	private function openExtType( $text, $name = null ) {
-		$opt = array( 'colspan' => 7 );
+		$opt = array( 'colspan' => 8 );
 		$out = '';
 
 		if ( $this->firstExtOpened ) {
@@ -639,7 +668,7 @@ class SpecialExtensionVersion extends SpecialPage {
 		}
 
 		$out .= "<tr>" . Xml::element( 'th', $opt, $text ) . "</tr>\n";
-		$out .= "<tr><td><b>Name</b></td><td><b>Version</b></td><td><b>current Branch</b></td><td><b>remote Branches</b></td><td><b>ID</b></td><td><b>Remote Update</b></td><td><b>Local Update Check</b></td></tr>\n";
+		$out .= "<tr><td><b>Name</b></td><td><b>Version</b></td><td><b>current Branch</b></td><td><b>remote Branches</b></td><td><b>ID</b></td><td><b>Remote Update</b></td><td><b>Local Update Check</b></td><td>fetch</td></tr>\n";
 
 		return $out;
 	}
@@ -891,7 +920,23 @@ class SpecialExtensionVersion extends SpecialPage {
 }
 
 class ExtendedGitInfo extends GitInfo {
-	public function getPullDate() {
+        
+    public function doFetch() {
+        global $wgGitBin;
+
+        if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
+            return false;
+        }
+        
+        $environment = array( "GIT_DIR" => $this->basedir );
+        $cmd = wfEscapeShellArg( $wgGitBin ) . " fetch -v";
+        $retc = false;
+        $fetchResult = wfShellExec( $cmd, $retc, $environment );
+
+        return $fetchResult;
+    }
+    
+	public function getPullDate($branch = '') {
         global $wgGitBin;
 
         if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
@@ -899,7 +944,7 @@ class ExtendedGitInfo extends GitInfo {
         }
 
         $environment = array( "GIT_DIR" => $this->basedir );
-        $cmd = wfEscapeShellArg( $wgGitBin ) . " reflog --date=raw -1 --format=format:%ct";
+        $cmd = wfEscapeShellArg( $wgGitBin ) . " reflog --date=raw -1 --format=format:%ct" . $branch;
         $retc = false;
         $pullDate = wfShellExec( $cmd, $retc, $environment );
 
@@ -910,6 +955,7 @@ class ExtendedGitInfo extends GitInfo {
         }
 		return $pullDate;
 	}
+    
 	public function getRemoteBranchList() {
 		global $wgGitBin;
 		
@@ -933,7 +979,7 @@ class ExtendedGitInfo extends GitInfo {
 			return $remoteBrancheList;
 		}
 	}
-    public function getOriginCommitDate() {
+    public function getOriginCommitDate($remoteBranch = 'master') {
         global $wgGitBin;
 
         if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
@@ -941,7 +987,7 @@ class ExtendedGitInfo extends GitInfo {
         }
 
         $environment = array( "GIT_DIR" => $this->basedir );
-        $cmd = wfEscapeShellArg( $wgGitBin ) . " show -s --format=format:%ct origin/".$this->getCurrentBranch();
+        $cmd = wfEscapeShellArg( $wgGitBin ) . " show -s --format=format:%ct origin/".$remoteBranch;
         $retc = false;
         $commitDate = wfShellExec( $cmd, $retc, $environment );
 
