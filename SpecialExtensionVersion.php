@@ -447,6 +447,7 @@ class SpecialExtensionVersion extends SpecialPage {
         $td = '<td>';
         $addRowspan = '';
         $gitCurrentBranch = false;
+        $fetchResult = false;
 
 		if ( isset( $extension['path'] ) ) {
 			$gitInfo = new ExtendedGitInfo( dirname( $extension['path'] ) );
@@ -481,7 +482,7 @@ class SpecialExtensionVersion extends SpecialPage {
 				}
                 $gitHeadCommitDate = $gitInfo->getHeadCommitDate();
                 if ( $gitHeadCommitDate ) {
-                    $datestringHeadCommit = date("d.m.Y",$gitHeadCommitDate);
+                    $datestringHeadCommit = date("d.m.Y H:i",$gitHeadCommitDate);
                     $vcsText .= '<br/>' . $datestringHeadCommit;
                 }
 				$vcsText .= '</td>';
@@ -539,8 +540,9 @@ class SpecialExtensionVersion extends SpecialPage {
 			$extNameVer = "<tr>
 				<td colspan=\"2\" $addRowspan><em>$mainLink</td>$td$versionText</em></td>";
 		}
-        
-        $extNameVer .= $td . $fetchResult . '</td>';
+        if ($fetchResult) {
+            $extNameVer .= $td . $fetchResult . '</td>';
+        }
         
 		$author = isset( $extension['author'] ) ? $extension['author'] : array();
 		$extDescAuthor = "<td>$description</td>
@@ -566,7 +568,7 @@ class SpecialExtensionVersion extends SpecialPage {
         $out = '';       
             $gitOriginCommitDate = $gitInfo->getOriginCommitDate($branch);
             if ( $gitOriginCommitDate ) {
-                $datestringHeadCommit = date("d.m.Y",$gitOriginCommitDate);
+                $datestringHeadCommit = date("d.m.Y H:i",$gitOriginCommitDate);
                 $datetimeHeadCommit = new DateTime($datestringHeadCommit);
                 
                 $intervalHeadCommit = $datetimeHeadCommit->diff($datetimeTody);
@@ -590,9 +592,10 @@ class SpecialExtensionVersion extends SpecialPage {
                 else {
                     $pullbranch = $branch;
                 }
-                $gitPullDate = $gitInfo->getPullDate($pullbranch);
+                //$gitPullDate = $gitInfo->getPullDate($pullbranch);
+                $gitPullDate = $gitInfo->getDateFromLog();
                 if ( $gitPullDate ) {
-                    $datestringPullDate = date("d.m.Y",$gitPullDate);
+                    $datestringPullDate = date("d.m.Y H:i",$gitPullDate);
                     
                     $datetime1 = new DateTime($datestringPullDate);
                     
@@ -668,7 +671,7 @@ class SpecialExtensionVersion extends SpecialPage {
 		}
 
 		$out .= "<tr>" . Xml::element( 'th', $opt, $text ) . "</tr>\n";
-		$out .= "<tr><td><b>Name</b></td><td><b>Version</b></td><td><b>current Branch</b></td><td><b>remote Branches</b></td><td><b>ID</b></td><td><b>Remote Update</b></td><td><b>Local Update Check</b></td><td>fetch</td></tr>\n";
+		$out .= '<tr><td><b>Name</b></td><td><b>Version</b></td><td><b>current Branch</b></td><td><b>remote Branches</b></td><td><b>ID</b></td><td width="130em"><b>Remote Update</b></td><td width="130em"><b>Local Update Check</b></td><td><b>fetch</b></td></tr>';
 
 		return $out;
 	}
@@ -923,17 +926,26 @@ class ExtendedGitInfo extends GitInfo {
         
     public function doFetch() {
         global $wgGitBin;
-
+        //print 'fetch start';
         if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
             return false;
         }
-        
-        $environment = array( "GIT_DIR" => $this->basedir );
-        $cmd = wfEscapeShellArg( $wgGitBin ) . " fetch -v";
-        $retc = false;
-        $fetchResult = wfShellExec( $cmd, $retc, $environment );
-
-        return $fetchResult;
+        if (is_writable ($this->basedir)) {
+            $filetime = filemtime ( $this->basedir . '/FETCH_HEAD' );
+            $timenow = time();
+            $timediff = $timenow - $filetime;
+            if ($timediff > 86400) {  
+                $environment = array( "GIT_DIR" => $this->basedir );
+                $cmd = wfEscapeShellArg( $wgGitBin ) . " fetch -v";
+                $retc = false;
+                $fetchResult = wfShellExec( $cmd, $retc, $environment );
+                return $fetchResult;
+            }
+            return $timediff . 's ago';
+        }
+        else {
+            return 'folder is not writable, dates may be inaccurate';
+        }
     }
     
 	public function getPullDate($branch = '') {
@@ -955,6 +967,18 @@ class ExtendedGitInfo extends GitInfo {
         }
 		return $pullDate;
 	}
+    
+    public function getDateFromLog() {
+        $LOGfile = $this->basedir . '/logs/HEAD';
+        if ( !is_readable( $LOGfile ) ) {
+            return false;
+        }
+        $filearray = file($LOGfile);
+        $lastline = end($filearray);
+        $lastlinearray = explode(' ', $lastline);
+        $rawdate = $lastlinearray[4] . $lastlinearray[5];
+        return $rawdate;
+    }
     
 	public function getRemoteBranchList() {
 		global $wgGitBin;
@@ -979,19 +1003,32 @@ class ExtendedGitInfo extends GitInfo {
 			return $remoteBrancheList;
 		}
 	}
-    public function getOriginCommitDate($remoteBranch = 'master') {
+    public function getOriginCommitDate($localBranch = 'master') {
         global $wgGitBin;
 
         if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
             return false;
         }
-
+        
         $environment = array( "GIT_DIR" => $this->basedir );
-        $cmd = wfEscapeShellArg( $wgGitBin ) . " show -s --format=format:%ct origin/".$remoteBranch;
-        $retc = false;
-        $commitDate = wfShellExec( $cmd, $retc, $environment );
+        
+        $cmd1 = wfEscapeShellArg( $wgGitBin ) . " config branch.".$localBranch.".merge";
+        $retc1 = false;
+        $merge = wfShellExec( $cmd1, $retc1, $environment );
 
-        if ( $retc !== 0 ) {
+        $mergeArray = explode('/', $merge);
+
+        $cmd2 = wfEscapeShellArg( $wgGitBin ) . " config branch.".$localBranch.".remote";
+        $retc2 = false;
+        $remote = wfShellExec( $cmd2, $retc2, $environment );
+        $remotetrim = trim($remote);
+        $remoteBranch = $remotetrim . "/" . end($mergeArray); 
+               
+        $cmd3 = wfEscapeShellArg( $wgGitBin ) . " show -s --format=format:%ct ".$remoteBranch;
+        $retc3 = false;
+        $commitDate = wfShellExec( $cmd3, $retc3, $environment );
+
+        if ( $retc3 !== 0 ) {
             return false;
         } else {
             return (int)$commitDate;
