@@ -22,6 +22,7 @@ $wgExtensionCredits['specialpage'][] = array (
 );
 
 $wgGroupPermissions['sysop']['extensionversion'] = true;
+$wgGroupPermissions['*']['extensionversion'] = false;
 $wgAvailableRights[] = 'extensionversion';
 
 $dir = dirname( __FILE__ ) . '/';
