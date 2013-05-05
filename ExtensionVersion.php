@@ -18,7 +18,7 @@ $wgExtensionCredits['specialpage'][] = array (
 	'description'=>'Versionsinfos.',
 	'descriptionmsg' => 'extensionversion-desc',
 	'author'=>'[http://www.daschmedia.de DaSch]',
-	'version'=>'0.0.4',
+	'version'=>'0.0.5',
 );
 
 $wgGroupPermissions['sysop']['extensionversion'] = true;

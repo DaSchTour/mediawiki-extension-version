@@ -931,10 +931,18 @@ class ExtendedGitInfo extends GitInfo {
             return false;
         }
         if (is_writable ($this->basedir)) {
+            /**
+             * Check how long last fetch ist ago
+             */
             $filetime = filemtime ( $this->basedir . '/FETCH_HEAD' );
             $timenow = time();
             $timediff = $timenow - $filetime;
-            if ($timediff > 86400) {  
+            /**
+             * use a random time to prevent all extensions beeing fetched on one reload 
+             */
+            $rand = mt_rand(24,72);
+            $rand = $rand * 3600;
+            if ($timediff > $rand) {  
                 $environment = array( "GIT_DIR" => $this->basedir );
                 $cmd = wfEscapeShellArg( $wgGitBin ) . " fetch -v";
                 $retc = false;
