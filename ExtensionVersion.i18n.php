@@ -28,5 +28,5 @@ $messages[ 'qqq' ] = array(
  */
 $messages[ 'de' ] = array(
 		'extensionversion' => "Erweiterungen Version", // Important! This is the string that appears on Special:SpecialPages
-		'extensionversion-desc' => "Zeigt Versionsinformationen für Erweiterungen",
+		'extensionversion-desc' => "Zeigt Versionsinformationen f√ºr Erweiterungen",
 );

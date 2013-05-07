@@ -496,7 +496,7 @@ class SpecialExtensionVersion extends SpecialPage {
 					$directoryRev = isset( $svnInfo['directory-rev'] ) ? $svnInfo['directory-rev'] : null;
 					$vcsText = $this->msg( 'version-svn-revision', $directoryRev, $svnInfo['checkout-rev'] )->text();
 					$vcsText = isset( $svnInfo['viewvc-url'] ) ? '[' . $svnInfo['viewvc-url'] . " $vcsText]" : $vcsText;
-					$vcsText = '<td colspan="3"> SVN: ' . $vcsText . '</td>';
+					$vcsText = '<td style="background-color:#F2DEDE"> SVN </td><td>N/A</td><td> ' . $vcsText . '</td><td colspan="3">N/A</td>';
 				}
 			}
 		}
@@ -538,7 +538,7 @@ class SpecialExtensionVersion extends SpecialPage {
 				$td<em>$mainLink</td>$td$versionText</em></td>$vcsText";
 		} else {
 			$extNameVer = "<tr>
-				<td colspan=\"2\" $addRowspan><em>$mainLink</td>$td$versionText</em></td>";
+				$td<em>$mainLink</td>$td$versionText</em></td><td colspan=\"6\" style=\"background-color:#F2DEDE\">not in version control</td>";
 		}
         if ($fetchResult) {
             $extNameVer .= $td . $fetchResult . '</td>';
@@ -947,7 +947,7 @@ class ExtendedGitInfo extends GitInfo {
                 $cmd = wfEscapeShellArg( $wgGitBin ) . " fetch -v";
                 $retc = false;
                 $fetchResult = wfShellExec( $cmd, $retc, $environment );
-                return $fetchResult;
+                return 'fetched from repo<br/>' . $fetchResult;
             }
             return $timediff . 's ago';
         }
