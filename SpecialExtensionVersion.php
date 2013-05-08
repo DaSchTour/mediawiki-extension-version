@@ -592,10 +592,11 @@ class SpecialExtensionVersion extends SpecialPage {
                 else {
                     $pullbranch = $branch;
                 }
-                //$gitPullDate = $gitInfo->getPullDate($pullbranch);
+                $gitWrongPullDate = $gitInfo->getPullDate();
                 $gitPullDate = $gitInfo->getDateFromLog();
                 if ( $gitPullDate ) {
                     $datestringPullDate = date("d.m.Y H:i",$gitPullDate);
+                    $datestringWrongPullDate = date("d.m.Y H:i",$gitWrongPullDate);
                     
                     $datetime1 = new DateTime($datestringPullDate);
                     
@@ -616,7 +617,7 @@ class SpecialExtensionVersion extends SpecialPage {
                     else {
                         $color = "#F2DEDE";
                     }
-                    $out .= '<td style="background-color:'.$color.'">' . $datestringPullDate . '<br/>(' . $intervalstring . ')</td>';
+                    $out .= '<td style="background-color:'.$color.'">' . $datestringPullDate . '<br/>(' . $intervalstring . ')<br/>date from reflog:<br/>'.$datestringWrongPullDate.'</td>';
                 }
             }
         return $out;
@@ -671,7 +672,7 @@ class SpecialExtensionVersion extends SpecialPage {
 		}
 
 		$out .= "<tr>" . Xml::element( 'th', $opt, $text ) . "</tr>\n";
-		$out .= '<tr><td><b>Name</b></td><td><b>Version</b></td><td><b>current Branch</b></td><td><b>remote Branches</b></td><td><b>ID</b></td><td width="130em"><b>Remote Update</b></td><td width="130em"><b>Local Update Check</b></td><td><b>fetch</b></td></tr>';
+		$out .= '<tr><td><b>Name</b></td><td><b>Version</b></td><td><b>current Branch</b></td><td><b>remote Branches</b></td><td><b>ID</b></td><td width="130em"><b>Remote Update</b></td><td width="130em"><b>Local Update</b></td><td><b>fetch</b></td></tr>';
 
 		return $out;
 	}
@@ -984,7 +985,7 @@ class ExtendedGitInfo extends GitInfo {
         $filearray = file($LOGfile);
         $lastline = end($filearray);
         $lastlinearray = explode(' ', $lastline);
-        $rawdate = $lastlinearray[4] . $lastlinearray[5];
+        $rawdate = $lastlinearray[4];
         return $rawdate;
     }
     
