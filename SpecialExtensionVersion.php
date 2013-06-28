@@ -448,6 +448,7 @@ class SpecialExtensionVersion extends SpecialPage {
         $addRowspan = '';
         $gitCurrentBranch = false;
         $fetchResult = false;
+        $fetchMax = 10;
 
 		if ( isset( $extension['path'] ) ) {
 			$gitInfo = new ExtendedGitInfo( dirname( $extension['path'] ) );
@@ -455,7 +456,20 @@ class SpecialExtensionVersion extends SpecialPage {
 			$gitHeadSHA1 = $gitInfo->getHeadSHA1();
             
             if ( $gitHeadSHA1 !== false ) {
-			    $fetchResult = $gitInfo->doFetch();
+            	if (empty($this->fetchnum)) {
+        			$this->fetchnum = 0;
+        		}
+        		if ($this->fetchnum <= $fetchMax) {
+			    	$fetchResult = $gitInfo->doFetch();
+			    	if ($fetchResult[1]) {
+			    		$fetchResult[0] .= ' (' . $this->fetchnum . '/' . $fetchMax . ')';
+			    		$this->fetchnum += 1;
+			    	}
+			    	
+			    }
+			    else {
+			    	$fetchResult[0] = 'more then ' . $fetchMax . ' fetched';
+			    }
 				$gitCurrentBranch = $gitInfo->getCurrentBranch();
 				
 				if ($gitCurrentBranch != 'master') {
@@ -540,8 +554,8 @@ class SpecialExtensionVersion extends SpecialPage {
 			$extNameVer = "<tr>
 				$td<em>$mainLink</td>$td$versionText</em></td><td colspan=\"6\" style=\"background-color:#F2DEDE\">not in version control</td>";
 		}
-        if ($fetchResult) {
-            $extNameVer .= $td . $fetchResult . '</td>';
+        if ($fetchResult[0]) {
+            $extNameVer .= $td . $fetchResult[0] . '</td>';
         }
         
 		$author = isset( $extension['author'] ) ? $extension['author'] : array();
@@ -931,6 +945,7 @@ class ExtendedGitInfo extends GitInfo {
         if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
             return false;
         }
+
         if (is_writable ($this->basedir)) {
             /**
              * Check how long last fetch ist ago
@@ -948,12 +963,12 @@ class ExtendedGitInfo extends GitInfo {
                 $cmd = wfEscapeShellArg( $wgGitBin ) . " fetch -v";
                 $retc = false;
                 $fetchResult = wfShellExec( $cmd, $retc, $environment );
-                return 'fetched from repo<br/>' . $fetchResult;
+                return array('fetched from repo<br/>' . $fetchResult, true);
             }
-            return $timediff . 's ago';
+            return array($timediff . 's ago', false);
         }
         else {
-            return 'folder is not writable, dates may be inaccurate';
+            return array('folder is not writable, dates may be inaccurate', false);
         }
     }
     
