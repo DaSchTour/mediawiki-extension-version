@@ -91,6 +91,7 @@ class SpecialExtensionVersion extends SpecialPage {
 	 * @return string
 	 */
 	static function softwareInformation() {
+		global $IP;
 		$dbr = wfGetDB( DB_SLAVE );
 
 		// Put the software in an array of form 'name' => 'version'. All messages should
@@ -101,7 +102,10 @@ class SpecialExtensionVersion extends SpecialPage {
 		$software['[http://www.php.net/ PHP]'] = phpversion() . " (" . PHP_SAPI . ")";
 		$software[$dbr->getSoftwareLink()] = $dbr->getServerInfo();
 		$software['Serversoftware'] = $_SERVER['SERVER_SOFTWARE'];
-
+		$gitInfo = new ExtendedGitInfo( $IP );
+		$gitversion = $gitInfo->getVersion();
+		$software['git'] = $gitversion;
+ 
 		// Allow a hook to add/remove items.
 		wfRunHooks( 'SoftwareInfo', array( &$software ) );
 
@@ -1002,6 +1006,26 @@ class ExtendedGitInfo extends GitInfo {
         $lastlinearray = explode(' ', $lastline);
         $rawdate = $lastlinearray[4];
         return $rawdate;
+    }
+    
+    public function getVersion() {
+    	global $wgGitBin;
+		
+		if ( !is_file( $wgGitBin ) || !is_executable( $wgGitBin ) ) {
+			return false;
+		}
+		
+		$environment = array( "GIT_DIR" => $this->basedir );
+		$cmd = wfEscapeShellArg( $wgGitBin ) . " --version";
+		$retc = false;
+        $version = wfShellExec( $cmd, $retc, $environment );
+        $version = explode(' ', $version);
+        if ( $retc !== 0 ) {
+            return false;
+        } else {
+            return end($version);
+        }
+		return end($version);
     }
     
 	public function getRemoteBranchList() {
