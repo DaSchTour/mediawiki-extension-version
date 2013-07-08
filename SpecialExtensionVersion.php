@@ -638,6 +638,9 @@ class SpecialExtensionVersion extends SpecialPage {
                     $out .= '<td style="background-color:'.$color.'">' . $datestringPullDate . '<br/>(' . $intervalstring . ')<br/>date from reflog:<br/>'.$datestringWrongPullDate.'</td>';
                 }
             }
+            else {
+                $out .= '<td colspan=2>N/A</td>';
+            }
         return $out;
     }
 
